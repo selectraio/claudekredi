@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SınavAI — Akıllı Çıkmış Soru PDF Oluşturucu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Noto+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root {
+  --bg: #06091a;
+  --surface: #0c1228;
+  --surface2: #111930;
+  --border: #1c2a4a;
+  --border2: #243560;
+  --gold: #e8a020;
+  --gold2: #c47a10;
+  --blue: #3b82f6;
+  --text: #dde3f5;
+  --dim: #7a8db5;
+  --correct: #22c55e;
+  --wrong: #ef4444;
+  --r: 14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{font-family:'Noto Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+/* Ambient glow background */
+body::before{
+  content:'';position:fixed;top:-200px;left:50%;transform:translateX(-50%);
+  width:800px;height:400px;
+  background:radial-gradient(ellipse,rgba(59,130,246,0.08) 0%,transparent 70%);
+  pointer-events:none;z-index:0;
+}
+
+/* HEADER */
+.header{
+  position:sticky;top:0;z-index:100;
+  background:rgba(6,9,26,0.92);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  padding:16px 32px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.logo{
+  font-family:'Syne',sans-serif;font-size:24px;font-weight:800;
+  background:linear-gradient(135deg,#e8a020,#f5d07a);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  letter-spacing:-0.5px;
+}
+.logo-tagline{font-size:12px;color:var(--dim);font-family:'Syne',sans-serif;font-weight:400;margin-top:1px;}
+
+.credit-btn{
+  display:flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,#e8a020,#c47a10);
+  color:#000;padding:10px 18px;border-radius:10px;
+  text-decoration:none;font-family:'Syne',sans-serif;
+  font-weight:700;font-size:13px;
+  transition:all .2s;box-shadow:0 4px 16px rgba(232,160,32,.25);
+}
+.credit-btn:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(232,160,32,.35);}
+
+/* MAIN */
+.main{max-width:860px;margin:0 auto;padding:40px 24px;position:relative;z-index:1;}
+
+.hero{text-align:center;padding:48px 0 40px;}
+.hero h1{
+  font-family:'Syne',sans-serif;font-size:clamp(28px,5vw,46px);
+  font-weight:800;line-height:1.15;margin-bottom:14px;
+}
+.hero h1 span{
+  background:linear-gradient(135deg,#e8a020,#f5d07a 50%,#e8a020);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero p{color:var(--dim);font-size:16px;line-height:1.6;max-width:520px;margin:0 auto;}
+
+.badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px;}
+.badge{
+  background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);
+  color:#93c5fd;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:500;
+}
+
+/* CARDS */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:28px;margin-bottom:20px;
+  transition:border-color .2s;
+}
+.card:hover{border-color:var(--border2);}
+.card-title{
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
+  color:var(--dim);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:18px;
+  display:flex;align-items:center;gap:8px;
+}
+.card-title span{color:var(--gold);}
+
+/* INPUTS */
+.input-row{display:flex;gap:8px;align-items:stretch;}
+input[type=password],input[type=text],input[type=email],select,textarea{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:13px 16px;color:var(--text);
+  font-family:'Noto Sans',sans-serif;font-size:14px;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+input:focus,select:focus,textarea:focus{
+  border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12);
+}
+input::placeholder{color:var(--dim);}
+select option{background:var(--surface2);}
+.icon-btn{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:12px 16px;color:var(--dim);
+  cursor:pointer;font-size:16px;transition:all .2s;white-space:nowrap;
+}
+.icon-btn:hover{border-color:var(--border2);color:var(--text);}
+
+.hint{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.5;}
+.hint a{color:var(--gold);text-decoration:none;}
+.hint a:hover{text-decoration:underline;}
+
+/* UPLOAD */
+.upload-zone{
+  border:2px dashed var(--border2);border-radius:12px;
+  padding:52px;text-align:center;cursor:pointer;
+  transition:all .3s;
+}
+.upload-zone:hover,.upload-zone.drag{
+  border-color:var(--gold);background:rgba(232,160,32,.04);
+}
+.upload-icon{font-size:52px;margin-bottom:14px;display:block;}
+.upload-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px;}
+.upload-sub{font-size:13px;color:var(--dim);}
+#fileInput{display:none;}
+
+.file-pill{
+  display:none;align-items:center;gap:12px;
+  background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);
+  border-radius:10px;padding:14px 18px;margin-top:14px;
+}
+.file-pill .fname{font-size:14px;font-weight:500;flex:1;}
+.file-pill .fsize{font-size:12px;color:var(--dim);}
+.remove-btn{background:none;border:none;color:var(--dim);cursor:pointer;font-size:20px;line-height:1;padding:0 4px;}
+.remove-btn:hover{color:var(--wrong);}
+
+/* GRID */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-group label{display:block;font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;}
+
+/* ERROR */
+.err-box{
+  display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);
+  border-radius:10px;padding:14px 18px;color:#fca5a5;font-size:13px;margin-top:12px;
+}
+
+/* GENERATE BTN */
+.gen-btn{
+  width:100%;background:linear-gradient(135deg,#e8a020,#c47a10);
+  color:#000;border:none;border-radius:var(--r);padding:20px;
+  font-family:'Syne',sans-serif;font-size:18px;font-weight:800;
+  cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 4px 24px rgba(232,160,32,.2);
+  letter-spacing:.3px;
+}
+.gen-btn:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(232,160,32,.35);}
+.gen-btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none;}
+
+/* PROGRESS */
+.prog-section{display:none;}
+.prog-bar{background:var(--surface2);border-radius:100px;height:10px;overflow:hidden;margin:14px 0;}
+.prog-fill{
+  height:100%;width:0%;border-radius:100px;
+  background:linear-gradient(90deg,var(--blue),var(--gold));
+  transition:width .6s cubic-bezier(.4,0,.2,1);
+}
+.prog-label{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:8px;}
+.spinner{
+  width:14px;height:14px;border:2px solid var(--border2);
+  border-top-color:var(--gold);border-radius:50%;
+  animation:spin .7s linear infinite;display:inline-block;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* RESULTS */
+.results-section{display:none;}
+.action-row{display:flex;gap:12px;margin-bottom:20px;}
+.act-btn{
+  flex:1;padding:14px;border-radius:12px;font-family:'Syne',sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;border:none;
+  transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.act-primary{background:linear-gradient(135deg,#e8a020,#c47a10);color:#000;}
+.act-primary:hover{opacity:.9;transform:translateY(-1px);}
+.act-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.act-secondary:hover{border-color:var(--border2);}
+
+/* ======================= */
+/* PREVIEW / DOCUMENT CSS  */
+/* ======================= */
+.preview-wrap{
+  background:#fff;border-radius:var(--r);overflow:hidden;
+  box-shadow:0 8px 40px rgba(0,0,0,.4);
+}
+
+/* === Document styles === */
+.doc-page{font-family:'Noto Sans',sans-serif;color:#1a1a2e;background:#fff;}
+
+.doc-hdr{
+  background:linear-gradient(135deg,#0d1b3e 0%,#1a1040 50%,#0d1b3e 100%);
+  padding:40px;text-align:center;
+}
+.doc-hdr-brand{
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:10px;
+}
+.doc-hdr-title{
+  font-family:'Syne',sans-serif;font-size:26px;font-weight:800;
+  color:#e8a020;margin-bottom:6px;line-height:1.2;
+}
+.doc-hdr-meta{font-size:13px;color:rgba(255,255,255,.5);}
+
+.doc-body{padding:36px 40px;}
+
+.q-card{
+  border:1px solid #dde0ec;border-radius:14px;
+  margin-bottom:36px;overflow:hidden;
+  page-break-inside:avoid;break-inside:avoid;
+}
+
+.q-top{
+  background:#f4f6ff;padding:18px 22px;
+  display:flex;align-items:flex-start;gap:16px;
+  border-bottom:1px solid #dde0ec;
+}
+.q-num{
+  background:#1a1040;color:#fff;min-width:36px;height:36px;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:15px;flex-shrink:0;
+}
+.q-txt{font-size:15px;font-weight:600;line-height:1.55;color:#1a1a2e;padding-top:4px;}
+
+/* Options table */
+.opts-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.opts-tbl th{
+  background:#f8f9ff;padding:10px 16px;text-align:left;
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+  color:#888;border-bottom:1px solid #e8eaf5;
+}
+.opts-tbl td{padding:13px 16px;border-bottom:1px solid #f0f2fa;vertical-align:top;line-height:1.5;}
+.opts-tbl tr:last-child td{border-bottom:none;}
+
+.row-c{background:rgba(34,197,94,.06);}
+.row-w{background:#fff;}
+
+.opt-icon{width:28px;text-align:center;font-size:16px;font-weight:800;}
+.opt-letter{width:36px;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;}
+.opt-letter.c{color:#16a34a;}
+.opt-letter.w{color:#dc2626;}
+.opt-explain{color:#555;font-size:13px;}
+
+/* Info sections */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;}
+.info-cell{padding:16px 20px;border-top:1px solid #e8eaf5;}
+.info-cell.full{grid-column:1/-1;}
+.info-cell.r{border-left:1px solid #e8eaf5;}
+.info-cell.green-bg{background:#f0fdf4;}
+.info-lbl{
+  font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;
+  margin-bottom:7px;display:flex;align-items:center;gap:5px;
+}
+.lbl-g{color:#16a34a;}
+.lbl-b{color:#2563eb;}
+.lbl-o{color:#d97706;}
+.lbl-p{color:#7c3aed;}
+.info-txt{font-size:13px;line-height:1.65;color:#374151;}
+
+/* Schema table */
+.schema-wrap{
+  padding:18px 20px;border-top:1px solid #e8eaf5;background:#fafbff;
+}
+.schema-wrap table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;}
+.schema-wrap table th{background:#1a1040;color:#fff;padding:9px 13px;text-align:left;font-size:11px;}
+.schema-wrap table td{padding:9px 13px;border:1px solid #e0e4f0;}
+.schema-wrap table tr:nth-child(even) td{background:#f4f6ff;}
+
+.doc-ftr{
+  padding:20px 40px;text-align:center;
+  color:#aaa;font-size:11px;border-top:1px solid #e8eaf5;
+  letter-spacing:.3px;
+}
+
+/* ========= PRINT ========= */
+@media print{
+  body > *:not(#pw){display:none!important;}
+  #pw{display:block!important;}
+  @page{margin:15mm;size:A4 portrait;}
+  .q-card{page-break-inside:avoid;break-inside:avoid;}
+  .doc-hdr{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .row-c,.info-cell.green-bg{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div>
+    <div class="logo">🎓 SınavAI</div>
+    <div class="logo-tagline">Çıkmış Soru Analiz Aracı</div>
+  </div>
+  <a href="https://console.anthropic.com/settings/billing" target="_blank" class="credit-btn">
+    💳 Claude Kredi Yükle
+  </a>
+</header>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- HERO -->
+  <div class="hero">
+    <h1>Çıkmış Soruları<br><span>Akıllı PDF'e Dönüştür</span></h1>
+    <p>PDF veya ZIP yükle · Claude analiz etsin · Her soru için doğru cevap, açıklama, istisnalar ve şema içeren detaylı çalışma PDF'i oluştur</p>
+    <div class="badges">
+      <span class="badge">✓ Şıklar açıklanır</span>
+      <span class="badge">✓ İstisnalar gösterilir</span>
+      <span class="badge">✓ Şema & Tablo</span>
+      <span class="badge">✓ ZIP desteği</span>
+    </div>
+  </div>
+
+  <!-- API KEY -->
+  <div class="card">
+    <div class="card-title"><span>🔑</span> Claude API Anahtarı</div>
+    <div class="input-row">
+      <input type="password" id="apiKey" placeholder="sk-ant-api03-xxxx" autocomplete="off"/>
+      <button class="icon-btn" onclick="toggleKey()" id="eyeBtn" title="Göster/Gizle">👁</button>
+      <button class="icon-btn" onclick="saveKey()" title="Kaydet">💾</button>
+    </div>
+    <p class="hint">
+      API anahtarın yok mu? <a href="https://console.anthropic.com/settings/api-keys" target="_blank">Ücretsiz al →</a> &nbsp;·&nbsp;
+      Kredi yükle: <a href="https://console.anthropic.com/settings/billing" target="_blank">console.anthropic.com/settings/billing →</a><br>
+      <span style="color:#e8a020;">💡 Anthropic API'de abonelik yok — sadece kullandığın kadar öde. İlk $5 ücretsiz başlayabilirsin.</span>
+    </p>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="card">
+    <div class="card-title"><span>📄</span> Soru Dosyası</div>
+    <div class="upload-zone" id="dz" onclick="document.getElementById('fileInput').click()">
+      <span class="upload-icon">📚</span>
+      <div class="upload-title">PDF veya ZIP sürükle & bırak</div>
+      <div class="upload-sub">ya da tıkla • Maks 32 MB • Birden fazla PDF için ZIP kullan</div>
+    </div>
+    <input type="file" id="fileInput" accept=".pdf,.zip">
+    <div class="file-pill" id="fpill">
+      <span id="ficon">📄</span>
+      <span class="fname" id="fname"></span>
+      <span class="fsize" id="fsize"></span>
+      <button class="remove-btn" onclick="clearFile()">×</button>
+    </div>
+    <div class="err-box" id="err"></div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="card">
+    <div class="card-title"><span>⚙️</span> Ayarlar</div>
+    <div class="two-col">
+      <div class="form-group">
+        <label>Sınav Türü</label>
+        <select id="examType">
+          <option value="genel">Otomatik Tanı</option>
+          <option value="kpss">KPSS</option>
+          <option value="tus">TUS (Tıp Uzmanlık)</option>
+          <option value="dus">DUS (Diş Hekimliği)</option>
+          <option value="yks">YKS / AYT / TYT</option>
+          <option value="lgs">LGS</option>
+          <option value="ales">ALES / GRE</option>
+          <option value="dgs">DGS</option>
+          <option value="ozel">Özel / Kurum Sınavı</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Detay Seviyesi</label>
+        <select id="detailLevel">
+          <option value="tam">Tam (Şema + İstisna + Strateji)</option>
+          <option value="orta">Orta (Açıklama + İstisnalar)</option>
+          <option value="ozet">Özet (Sadece Açıklama)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERATE -->
+  <button class="gen-btn" id="genBtn" onclick="generate()">
+    🚀 Akıllı Çalışma PDF'i Oluştur
+  </button>
+
+  <!-- PROGRESS -->
+  <div class="card prog-section" id="prog">
+    <div class="card-title"><span class="spinner"></span> Claude analiz ediyor...</div>
+    <div class="prog-bar"><div class="prog-fill" id="pf"></div></div>
+    <div class="prog-label" id="pl">Hazırlanıyor...</div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-section" id="results">
+    <div class="action-row">
+      <button class="act-btn act-primary" onclick="printDoc()">📥 PDF Olarak Kaydet / Yazdır</button>
+      <button class="act-btn act-secondary" onclick="reset()">🔄 Yeni Dosya</button>
+    </div>
+    <div class="preview-wrap" id="preview"></div>
+  </div>
+
+</div>
+
+<!-- Hidden print target -->
+<div id="pw" style="display:none;"></div>
+
+<script>
+/* ======================== STATE ======================== */
+let file = null;
+let fileB64 = null;       // base64 (PDF) - anında okunur
+let fileZipBuf = null;    // ArrayBuffer (ZIP) - anında okunur
+let fileIsZip = false;
+
+/* ======================== INIT ======================== */
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('sinavai_key');
+  if (saved) document.getElementById('apiKey').value = saved;
+});
+
+/* ======================== API KEY ======================== */
+function toggleKey() {
+  const i = document.getElementById('apiKey');
+  const btn = document.getElementById('eyeBtn');
+  i.type = i.type === 'password' ? 'text' : 'password';
+  btn.textContent = i.type === 'password' ? '👁' : '🔒';
+}
+function saveKey() {
+  const k = document.getElementById('apiKey').value.trim();
+  if (k) { localStorage.setItem('sinavai_key', k); showMsg('API anahtarı kaydedildi ✓', 'ok'); }
+}
+
+/* ======================== FILE ======================== */
+const dz = document.getElementById('dz');
+const fi = document.getElementById('fileInput');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
+fi.addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]); });
+
+function setFile(f) {
+  const ok = f.name.endsWith('.pdf') || f.name.endsWith('.zip');
+  if (!ok) return showErr('Sadece PDF veya ZIP kabul edilir.');
+  if (f.size > 33 * 1024 * 1024) return showErr('Dosya 32 MB\u0027\u0131 aşıyor.');
+  file = f;
+  fileIsZip = f.name.endsWith('.zip');
+  fileB64 = null;
+  hideErr();
+  document.getElementById('fpill').style.display = 'flex';
+  document.getElementById('ficon').textContent = fileIsZip ? '🗜️' : '📄';
+  document.getElementById('fname').textContent = f.name;
+  document.getElementById('fsize').textContent = fmtSize(f.size);
+  dz.style.display = 'none';
+  // Dosyayı hemen oku — mobil tarayıcılarda File referansı sonradan geçersiz olabilir
+  if (!fileIsZip) {
+    b64(f).then(data => { fileB64 = data; }).catch(() => { fileB64 = null; });
+  } else {
+    readAsArrayBuffer(f).then(buf => { fileZipBuf = buf; }).catch(() => { fileZipBuf = null; });
+  }
+}
+function clearFile() {
+  file = null; fileB64 = null; fileZipBuf = null; fileIsZip = false; fi.value = '';
+  document.getElementById('fpill').style.display = 'none';
+  dz.style.display = 'block';
+}
+function fmtSize(b) {
+  return b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
+}
+
+/* ======================== HELPERS ======================== */
+function showErr(m) { const e=document.getElementById('err'); e.innerHTML='⚠️ '+m; e.style.display='block'; }
+function hideErr() { document.getElementById('err').style.display='none'; }
+function showMsg(m,t) { showErr(m); document.getElementById('err').style.background = t==='ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.08)'; document.getElementById('err').style.color = t==='ok' ? '#4ade80' : '#fca5a5'; document.getElementById('err').style.borderColor = t==='ok' ? 'rgba(34,197,94,.3)' : 'rgba(239,68,68,.25)'; }
+function setP(pct, lbl) { document.getElementById('pf').style.width = pct+'%'; document.getElementById('pl').textContent = lbl; }
+function b64(f) {
+  return new Promise((res,rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = () => rej(new Error('Dosya okunamadı'));
+    r.readAsDataURL(f);
+  });
+}
+function readAsArrayBuffer(f) {
+  return new Promise((res,rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error('ZIP okunamadı'));
+    r.readAsArrayBuffer(f);
+  });
+}
+function blobB64(blob) {
+  return new Promise((res,rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = () => rej(new Error('PDF okunamadı'));
+    r.readAsDataURL(blob);
+  });
+}
+
+/* ======================== PROMPT ======================== */
+function buildPrompt(examType, detailLevel) {
+  return `Sen tıp fakültesi 1. sınıf öğrencilerine yönelik çıkmış soru analizi yapan uzman bir tıp eğitimcisisin. Görevin: PDF'deki HER soruyu analiz edip, saf bilgi içeren, boş cümle içermeyen, sınav odaklı açıklamalar üretmek.
+
+MUTLAK KURALLAR:
+1. PDF'deki TÜM soruları ekle, hiçbirini atlama.
+2. Motivasyon, teşvik veya "bu konuyu iyi çalışın" gibi boş cümleler YAZMA. Sadece sert bilgi.
+3. Her şık için GERÇEK tıbbi açıklama yaz — sadece "doğru" veya "yanlış" yazma, NEDEN doğru/yanlış olduğunu mekanizma düzeyinde açıkla.
+4. correctExplanation: Konunun özünü mekanizma/fizyoloji/biyokimya düzeyinde anlat. Soru "üreaz testi" soruyorsa → üreazın substratı, ürünler, pH değişimi, hangi bakterilerde pozitif, hangi bakterilerde negatif — hepsini yaz.
+5. examNotes: Bu konudan başka ne sorulabilir? Hangi varyasyonlar çıkmış? Hangi tuzaklara dikkat? Önem derecesi: ⭐⭐⭐ / ⭐⭐ / ⭐
+6. exceptions: Bu konunun GERÇEK istisnaları. "İstisna yok" yazma — varsa yaz, gerçekten yoksa "Bu konuda standart kural işler, istisna tanımlanmamış." yaz.
+7. tips: Ezber için mekanizma zinciri veya karşılaştırma. Örn: "Üreaz(+): Proteus, H.pylori, Klebsiella, Cryptococcus — Üreaz(-): E.coli, Salmonella, Pseudomonas"
+8. schema: Konuyu karşılaştırmalı anlatmak için tablo GERÇEKTEN gerekiyorsa HTML <table> yaz (örn. 3+ organizma karşılaştırması, birden fazla enzim/yol). Gereksizse null yaz.
+
+1. SINIF TIP FAKÜLTESİ KAPSAMI: Anatomi, Histoloji, Biyokimya (enzimler, metabolizma, lipidler, nükleotidler), Fizyoloji, Mikrobiyoloji (bakteri/virüs/parazit boya/test/özellik), Genetik, İmmünoloji, Embriyoloji. Bu derslerin terminolojisini ve mekanizmalarını kullan.
+
+KRİTİK FORMAT: Yanıtını YALNIZCA geçerli JSON olarak ver. Hiçbir açıklama, markdown, \`\`\` işareti ekleme. Doğrudan { ile başla.
+
+{
+  "examTitle": "PDF başlığı veya tespit ettiğin konu",
+  "questions": [
+    {
+      "number": 1,
+      "text": "Sorunun tam metni",
+      "options": [
+        {"letter":"A","text":"Şık metni","isCorrect":false,"explanation":"YANLIŞ — [gerçek tıbbi neden, mekanizma düzeyinde]"},
+        {"letter":"B","text":"Şık metni","isCorrect":true,"explanation":"DOĞRU — [neden doğru olduğunun mekanizması]"},
+        {"letter":"C","text":"Şık metni","isCorrect":false,"explanation":"YANLIŞ — [gerçek tıbbi neden]"},
+        {"letter":"D","text":"Şık metni","isCorrect":false,"explanation":"YANLIŞ — [gerçek tıbbi neden]"},
+        {"letter":"E","text":"Şık metni","isCorrect":false,"explanation":"YANLIŞ — [gerçek tıbbi neden]"}
+      ],
+      "correctExplanation": "Konunun mekanizma düzeyinde özeti. Substrat→enzim→ürün zinciri, fizyolojik anlam, klinik bağlantı. En az 4-5 cümle, bilgi dolu.",
+      "examNotes": "⭐⭐⭐ Yüksek öncelik / Bu konudan başka ne sorulabilir: [somut soru varyasyonları]. Hangi yıl/komitelerde çıkmış: [bilgi]. Sık karıştırılan: [spesifik tuzak].",
+      "exceptions": "Gerçek istisnalar veya 'Bu konuda standart kural işler, istisna tanımlanmamış.'",
+      "tips": "Ezber zinciri veya karşılaştırma listesi. Örn boyalar: Gram(+)=mor, Gram(-)=pembe — ZN=aside dirençli — Giemsa=parazit/Rickettsia",
+      "schema": null
+    }
+  ]
+}
+
+Şık sayısı 4 de olabilir 5 de — kaç şık varsa o kadar ekle. PDF'deki TÜM soruları işle, hiçbirini çıkarma.`;
+}
+
+/* ======================== CLAUDE CALL ======================== */
+async function callClaude(pdfB64, apiKey, examType, detailLevel) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 16000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type:'document', source:{ type:'base64', media_type:'application/pdf', data:pdfB64 } },
+          { type:'text', text: buildPrompt(examType, detailLevel) }
+        ]
+      }]
+    })
+  });
+
+  if (!resp.ok) {
+    const e = await resp.json().catch(()=>({}));
+    if (resp.status === 401) throw new Error('API anahtarı geçersiz. Lütfen kontrol edin.');
+    if (resp.status === 429) throw new Error('API rate limit aşıldı. Birkaç dakika bekleyin veya kredi yükleyin: console.anthropic.com/settings/billing');
+    if (resp.status === 413) throw new Error('PDF çok büyük. Daha küçük bir dosya deneyin veya sayfaları bölerek ZIP yapın.');
+    throw new Error((e.error?.message)||'API hatası: '+resp.status);
+  }
+
+  const d = await resp.json();
+  let txt = d.content.map(b=>b.text||'').join('').trim();
+  // Clean markdown fences if present
+  txt = txt.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/,'').trim();
+  
+  try { return JSON.parse(txt); }
+  catch {
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error('Claude yanıtı JSON olarak ayrıştırılamadı. Lütfen tekrar deneyin.');
+  }
+}
+
+/* ======================== GENERATE ======================== */
+async function generate() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const examType = document.getElementById('examType').value;
+  const detailLevel = document.getElementById('detailLevel').value;
+
+  if (!apiKey) return showErr('Lütfen Claude API anahtarınızı girin.');
+  if (!apiKey.startsWith('sk-ant-')) return showErr('Geçersiz API anahtarı formatı. "sk-ant-" ile başlamalı.');
+  if (!file) return showErr('Lütfen bir PDF veya ZIP dosyası yükleyin.');
+
+  hideErr();
+  document.getElementById('genBtn').disabled = true;
+  document.getElementById('prog').style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+
+  try {
+    let questions = [], title = '';
+
+    if (fileIsZip) {
+      setP(15, 'ZIP dosyası açılıyor...');
+      if (!fileZipBuf) throw new Error('ZIP dosyası okunamadı. Lütfen dosyayı tekrar seçin.');
+      const zip = await JSZip.loadAsync(fileZipBuf);
+      const pdfs = Object.keys(zip.files).filter(n => n.toLowerCase().endsWith('.pdf') && !zip.files[n].dir);
+      if (!pdfs.length) throw new Error('ZIP içinde PDF bulunamadı.');
+
+      for (let i = 0; i < pdfs.length; i++) {
+        const name = pdfs[i];
+        setP(15 + (i/pdfs.length)*70, `"${name.split('/').pop()}" işleniyor... (${i+1}/${pdfs.length})`);
+        const blob = await zip.files[name].async('blob');
+        const b64str = await blobB64(blob);
+        const res = await callClaude(b64str, apiKey, examType, detailLevel);
+        if (res.questions) { questions = questions.concat(res.questions); if (!title && res.examTitle) title = res.examTitle; }
+      }
+    } else {
+      setP(20, 'PDF gönderiliyor...');
+      // Önceden okunan base64'ü kullan; yoksa tekrar oku
+      const b64str = fileB64 || await b64(file);
+      setP(35, 'Claude analiz ediyor... Bu 30–90 saniye sürebilir.');
+      const res = await callClaude(b64str, apiKey, examType, detailLevel);
+      questions = res.questions || [];
+      title = res.examTitle || '';
+    }
+
+    if (!questions.length) throw new Error('Hiç soru işlenemedi. PDF\'nin metin tabanlı olduğundan emin olun (taranmış görüntü PDF değil).');
+
+    setP(95, 'Belge oluşturuluyor...');
+    const html = buildDoc(title || file.name.replace(/\.[^.]+$/,''), questions, examType, detailLevel);
+
+    document.getElementById('preview').innerHTML = html;
+    document.getElementById('pw').innerHTML = html;
+
+    setP(100, `✅ Tamamlandı! ${questions.length} soru işlendi.`);
+
+    setTimeout(() => {
+      document.getElementById('prog').style.display = 'none';
+      document.getElementById('results').style.display = 'block';
+      document.getElementById('genBtn').disabled = false;
+      document.getElementById('results').scrollIntoView({ behavior:'smooth' });
+    }, 900);
+
+  } catch(err) {
+    document.getElementById('prog').style.display = 'none';
+    document.getElementById('genBtn').disabled = false;
+    showErr(err.message || 'Beklenmedik hata oluştu.');
+  }
+}
+
+/* ======================== BUILD DOCUMENT ======================== */
+function buildDoc(title, questions, examType, detailLevel) {
+  const labels = { genel:'Çıkmış Soru Analizi', kpss:'KPSS', tus:'TUS', dus:'DUS', yks:'YKS', lgs:'LGS', ales:'ALES', dgs:'DGS', ozel:'Özel Sınav' };
+  const now = new Date().toLocaleDateString('tr-TR', {year:'numeric',month:'long',day:'numeric'});
+
+  const qCards = questions.map((q, idx) => {
+    // Options rows
+    const optRows = (q.options||[]).map(o => {
+      const ic = o.isCorrect;
+      return `<tr class="${ic?'row-c':'row-w'}">
+        <td class="opt-icon" style="color:${ic?'#16a34a':'#dc2626'};">${ic?'✓':'✗'}</td>
+        <td class="opt-letter ${ic?'c':'w'}">${o.letter||''}</td>
+        <td>${escHtml(o.text||'')}</td>
+        <td class="opt-explain">${escHtml(o.explanation||'')}</td>
+      </tr>`;
+    }).join('');
+
+    // Info cells
+    let infoCells = '';
+
+    if (q.correctExplanation) {
+      infoCells += `<div class="info-cell full green-bg">
+        <div class="info-lbl lbl-g">✓ Konu Özeti & Mekanizma</div>
+        <div class="info-txt">${escHtml(q.correctExplanation)}</div>
+      </div>`;
+    }
+
+    if (q.examNotes) {
+      infoCells += `<div class="info-cell">
+        <div class="info-lbl lbl-b">📌 Sınavda Çıkma & Varyasyonlar</div>
+        <div class="info-txt">${escHtml(q.examNotes)}</div>
+      </div>`;
+    }
+    if (q.exceptions) {
+      infoCells += `<div class="info-cell r">
+        <div class="info-lbl lbl-o">⚠️ İstisnalar & Tuzaklar</div>
+        <div class="info-txt">${escHtml(q.exceptions)}</div>
+      </div>`;
+    }
+
+    if (q.tips) {
+      infoCells += `<div class="info-cell full">
+        <div class="info-lbl lbl-p">🔑 Kilit Bilgi & Ezber Zinciri</div>
+        <div class="info-txt">${escHtml(q.tips)}</div>
+      </div>`;
+    }
+
+    const schemaSection = (q.schema && q.schema !== 'null' && q.schema !== null)
+      ? `<div class="schema-wrap">
+          <div class="info-lbl lbl-b" style="margin-bottom:8px;">📊 Karşılaştırma Tablosu</div>
+          ${q.schema}
+        </div>` : '';
+
+    return `<div class="q-card">
+      <div class="q-top">
+        <div class="q-num">${q.number||idx+1}</div>
+        <div class="q-txt">${escHtml(q.text||'')}</div>
+      </div>
+      <table class="opts-tbl">
+        <thead><tr>
+          <th width="28"></th>
+          <th width="40">Şık</th>
+          <th>İfade</th>
+          <th width="38%">Açıklama</th>
+        </tr></thead>
+        <tbody>${optRows}</tbody>
+      </table>
+      <div class="info-grid">${infoCells}</div>
+      ${schemaSection}
+    </div>`;
+  }).join('');
+
+  return `<div class="doc-page">
+    <div class="doc-hdr">
+      <div class="doc-hdr-brand">SınavAI · Claude API Destekli</div>
+      <div class="doc-hdr-title">🎓 ${labels[examType]||'Sınav'} — ${escHtml(title)}</div>
+      <div class="doc-hdr-meta">${questions.length} Soru · ${now} · ${detailLevel === 'tam' ? 'Tam Detay' : detailLevel === 'orta' ? 'Orta Detay' : 'Özet'}</div>
+    </div>
+    <div class="doc-body">${qCards}</div>
+    <div class="doc-ftr">
+      SınavAI ile oluşturuldu · Powered by Claude API · console.anthropic.com
+    </div>
+  </div>`;
+}
+
+function escHtml(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/\n/g,'<br>');
+}
+
+/* ======================== PRINT ======================== */
+function printDoc() {
+  document.getElementById('pw').style.display = 'block';
+  window.print();
+  setTimeout(() => { document.getElementById('pw').style.display = 'none'; }, 1500);
+}
+
+function reset() {
+  clearFile();
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('preview').innerHTML = '';
+  window.scrollTo({ top: 0, behavior:'smooth' });
+}
+</script>
+</body>
+</html>
